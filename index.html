@@ -39,9 +39,12 @@
 
       <form id="food-form" class="food-form">
         <input type="text" id="food-name" placeholder="Food (e.g. Banana)" required />
+        <button type="button" id="estimate-btn" class="estimate-btn" title="Auto-estimate calories from the food database">🔍 Estimate</button>
         <input type="number" id="food-cal" placeholder="Calories" min="1" required />
         <button type="submit">Add</button>
       </form>
+
+      <div id="food-preview" class="food-preview"></div>
 
       <ul id="food-list" class="food-list"></ul>
       <button id="reset-day" class="reset-btn">Reset day</button>
