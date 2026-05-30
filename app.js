@@ -28,6 +28,13 @@ const PLANS = [
     macros: "50% carbs · 25% protein · 25% fat",
     workouts: ["Yoga (3x/week)", "Cycling 40 min", "Bodyweight circuit"],
   },
+  {
+    id: "mediterranean",
+    name: "Mediterranean",
+    calories: 2100,
+    macros: "45% carbs · 20% protein · 35% fat",
+    workouts: ["Outdoor walk 45 min", "Swimming (2x/week)", "Mobility & stretching"],
+  },
 ];
 
 // ===== State, loaded from the browser's localStorage so it persists =====
@@ -100,6 +107,9 @@ function renderTracker() {
 
   const list = document.getElementById("food-list");
   list.innerHTML = "";
+  if (state.foods.length === 0) {
+    list.innerHTML = `<li style="justify-content:center;color:var(--muted)">No foods logged yet — add your first meal above 🍽️</li>`;
+  }
   state.foods.forEach((food, i) => {
     const li = document.createElement("li");
     li.innerHTML = `<span>${food.name}</span><span>${food.cal} kcal <button class="del" title="Remove">✕</button></span>`;
