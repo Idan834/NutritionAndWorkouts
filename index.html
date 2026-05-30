@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nutrition &amp; Workouts</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <h1>🥗 Nutrition &amp; Workouts</h1>
+    <nav>
+      <button class="tab-btn active" data-tab="plans">Diet Plans</button>
+      <button class="tab-btn" data-tab="tracker">Calorie Tracker</button>
+      <button class="tab-btn" data-tab="workouts">Workouts</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- DIET PLANS -->
+    <section id="plans" class="tab-panel active">
+      <h2>Choose your plan</h2>
+      <p class="subtitle">Pick a plan and we'll set your daily calorie goal.</p>
+      <div id="plan-cards" class="card-grid"></div>
+    </section>
+
+    <!-- CALORIE TRACKER -->
+    <section id="tracker" class="tab-panel">
+      <h2>Today's calories</h2>
+
+      <div class="goal-box">
+        <div>
+          <span class="big-number" id="consumed">0</span>
+          <span class="unit">/ <span id="goal">2000</span> kcal</span>
+        </div>
+        <div class="progress"><div class="progress-fill" id="progress-fill"></div></div>
+        <p id="remaining" class="remaining">2000 kcal remaining</p>
+      </div>
+
+      <form id="food-form" class="food-form">
+        <input type="text" id="food-name" placeholder="Food (e.g. Banana)" required />
+        <input type="number" id="food-cal" placeholder="Calories" min="1" required />
+        <button type="submit">Add</button>
+      </form>
+
+      <ul id="food-list" class="food-list"></ul>
+      <button id="reset-day" class="reset-btn">Reset day</button>
+    </section>
+
+    <!-- WORKOUTS -->
+    <section id="workouts" class="tab-panel">
+      <h2>Workout suggestions</h2>
+      <p class="subtitle">Based on your selected plan.</p>
+      <div id="workout-list" class="card-grid"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>Current plan: <strong id="current-plan">None yet</strong></span>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
