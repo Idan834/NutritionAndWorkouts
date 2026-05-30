@@ -69,15 +69,59 @@ const PLANS = [
   },
 ];
 
+// ===== Curated calorie data (kcal per 100g) for common whole foods =====
+// Accurate values for everyday foods, so estimates don't depend on the
+// packaged-product database (which often matches the wrong item).
+const FOODS = {
+  // Fruit
+  banana: 89, apple: 52, orange: 47, strawberry: 32, strawberries: 32,
+  grapes: 69, watermelon: 30, mango: 60, pineapple: 50, blueberries: 57,
+  avocado: 160, pear: 57, peach: 39, kiwi: 61, cherries: 50, pomegranate: 83,
+  // Vegetables
+  broccoli: 34, carrot: 41, tomato: 18, potato: 77, "sweet potato": 86,
+  spinach: 23, cucumber: 15, onion: 40, corn: 86, lettuce: 15,
+  "bell pepper": 31, mushroom: 22, zucchini: 17, cauliflower: 25, peas: 81,
+  // Protein
+  "chicken breast": 165, chicken: 165, beef: 250, steak: 271, pork: 242,
+  salmon: 208, tuna: 132, shrimp: 99, egg: 155, eggs: 155, tofu: 76,
+  turkey: 135, bacon: 541, cod: 82, sausage: 301,
+  // Dairy
+  milk: 42, "greek yogurt": 59, yogurt: 61, cheese: 402, cheddar: 402,
+  butter: 717, mozzarella: 280, "cottage cheese": 98,
+  // Grains & carbs
+  rice: 130, "white rice": 130, "brown rice": 112, pasta: 131, spaghetti: 158,
+  bread: 265, oats: 389, oatmeal: 71, quinoa: 120, bagel: 250, tortilla: 218,
+  noodles: 138, couscous: 112, cereal: 379,
+  // Nuts & legumes
+  almonds: 579, walnuts: 654, cashews: 553, "peanut butter": 588, peanuts: 567,
+  lentils: 116, chickpeas: 164, "black beans": 132, hummus: 166, beans: 127,
+  // Other common foods
+  "olive oil": 884, honey: 304, sugar: 387, "dark chocolate": 546,
+  chocolate: 546, pizza: 266, hamburger: 295, "french fries": 312, fries: 312,
+  "ice cream": 207, donut: 452, cookie: 502, "potato chips": 536, chips: 536,
+  popcorn: 387, "orange juice": 45, "apple juice": 46, coffee: 1,
+};
+
+// Title-case a food name so it matches TheMealDB's ingredient image filenames.
+function titleCase(str) {
+  return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// A real photo for (almost) any ingredient, from TheMealDB's free image set.
+// Unknown names just 404 and are removed gracefully by the <img onerror>.
+function imageForFood(name) {
+  return (
+    "https://www.themealdb.com/images/ingredients/" +
+    encodeURIComponent(titleCase(name.trim())) +
+    "-Small.png"
+  );
+}
+
 // ===== State, loaded from the browser's localStorage so it persists =====
 let state = {
   planId: localStorage.getItem("planId") || null,
   foods: JSON.parse(localStorage.getItem("foods") || "[]"),
 };
-
-// Holds the photo + matched name from the most recent "Estimate" lookup,
-// so it can be attached to the food when the user clicks "Add".
-let lastLookup = { img: "", matchedName: "" };
 
 function save() {
   localStorage.setItem("planId", state.planId || "");
@@ -212,64 +256,55 @@ function renderAll() {
   renderFooter();
 }
 
-// ===== Food lookup against Open Food Facts (free, no API key) =====
-// Returns { kcal, img, name } for the best match, or null if nothing usable.
-async function lookupFood(name) {
+// ===== Calorie lookup against Open Food Facts (used only as a fallback) =====
+// Returns kcal per 100g for the best packaged-product match, or null.
+async function lookupFoodOFF(name) {
   const url =
     "https://world.openfoodfacts.org/cgi/search.pl?search_terms=" +
     encodeURIComponent(name) +
     "&search_simple=1&action=process&json=1&page_size=15" +
-    "&fields=product_name,nutriments,image_front_url,image_url";
+    "&fields=nutriments";
 
   const res = await fetch(url);
   if (!res.ok) throw new Error("network");
   const data = await res.json();
   const products = data.products || [];
-
-  // Pick the first product that has a calorie value we can use.
   const match = products.find(
     (p) => p.nutriments && p.nutriments["energy-kcal_100g"]
   );
-  if (!match) return null;
+  return match ? Math.round(match.nutriments["energy-kcal_100g"]) : null;
+}
 
-  return {
-    kcal: Math.round(match.nutriments["energy-kcal_100g"]),
-    img: match.image_front_url || match.image_url || "",
-    name: match.product_name || name,
-  };
+// Estimate calories: our curated common-foods table first (accurate), then
+// fall back to the packaged-product database for anything not in the table.
+async function estimateCalories(name) {
+  const key = name.trim().toLowerCase();
+  if (FOODS[key] != null) return { kcal: FOODS[key], source: "common foods" };
+  try {
+    const kcal = await lookupFoodOFF(name);
+    if (kcal != null) return { kcal, source: "product database" };
+  } catch (e) {}
+  return null;
 }
 
 // "Estimate" button: fill the calorie field + show a real photo. Fully optional.
 document.getElementById("estimate-btn").addEventListener("click", async () => {
   const name = document.getElementById("food-name").value.trim();
   const preview = document.getElementById("food-preview");
-  lastLookup = { img: "", matchedName: "" };
   if (!name) {
     preview.innerHTML = `<span class="hint">Type a food name first, then estimate.</span>`;
     return;
   }
-  preview.innerHTML = `<span class="hint">Looking up "${name}"…</span>`;
-  try {
-    const result = await lookupFood(name);
-    if (!result) {
-      preview.innerHTML = `<span class="hint">No match found — just type the calories in yourself.</span>`;
-      return;
-    }
-    // Pre-fill calories (user can still edit it before adding).
-    document.getElementById("food-cal").value = result.kcal;
-    lastLookup = { img: result.img, matchedName: result.name };
-    const photo = result.img
-      ? `<img class="preview-img" src="${result.img}" alt="${result.name}" onerror="this.remove()" />`
-      : "";
-    preview.innerHTML = `
-      ${photo}
-      <div>
-        <strong>${result.name}</strong><br />
-        <span class="hint">≈ ${result.kcal} kcal per 100g — edit if your portion differs.</span>
-      </div>`;
-  } catch (e) {
-    preview.innerHTML = `<span class="hint">Couldn't reach the food database. Enter calories manually.</span>`;
+  preview.innerHTML = `<span class="hint">Estimating "${name}"…</span>`;
+  const result = await estimateCalories(name);
+  const photo = `<img class="preview-img" src="${imageForFood(name)}" alt="${name}" onerror="this.remove()" />`;
+  if (!result) {
+    preview.innerHTML = `${photo}<div><strong>${titleCase(name)}</strong><br /><span class="hint">Couldn't estimate calories — just type them in yourself.</span></div>`;
+    return;
   }
+  // Pre-fill calories (user can still edit before adding).
+  document.getElementById("food-cal").value = result.kcal;
+  preview.innerHTML = `${photo}<div><strong>${titleCase(name)}</strong><br /><span class="hint">≈ ${result.kcal} kcal per 100g (${result.source}) — edit if your portion differs.</span></div>`;
 });
 
 // ===== Add-food form =====
@@ -279,32 +314,15 @@ document.getElementById("food-form").addEventListener("submit", (e) => {
   const cal = parseInt(document.getElementById("food-cal").value, 10);
   if (!name || !Number.isFinite(cal) || cal <= 0) return;
 
-  // If the estimate we just did was for this same food, keep its photo.
-  const img =
-    lastLookup.matchedName && name.length ? lastLookup.img : "";
-  const food = { name, cal, img };
-  state.foods.push(food);
+  // Every food gets a real photo derived from its name (broken/unknown
+  // names are removed automatically by the <img onerror> in renderTracker).
+  state.foods.push({ name, cal, img: imageForFood(name) });
   save();
   renderTracker();
-
-  // If we don't already have a photo, fetch one in the background so the
-  // food still shows a real picture even when calories were typed manually.
-  if (!img) {
-    lookupFood(name)
-      .then((r) => {
-        if (r && r.img) {
-          food.img = r.img;
-          save();
-          renderTracker();
-        }
-      })
-      .catch(() => {});
-  }
 
   // Reset the form for the next entry.
   e.target.reset();
   document.getElementById("food-preview").innerHTML = "";
-  lastLookup = { img: "", matchedName: "" };
   document.getElementById("food-name").focus();
 });
 
